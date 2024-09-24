@@ -32,15 +32,35 @@ sub check_user {
 	return \%user_hash;
 }
 
+sub print_user {
+	my $user = shift;
+	$user->{"Pager Number"} = "N/A" if !$user->{"Pager Number"};
+	$user->{"Org unit"} = "N/A" if !$user->{"Org unit"};
+	$user->{"Telephone Number"} = "N/A" if !$user->{"Telephone Number"};
+	$user->{"Email address"} = "N/A" if !$user->{"Email address"};
+	print $user->{"First name"} . "," . $user->{"Last name"} . "," . $user->{"Email address"} . "," . $user->{"Telephone Number"} . "," . $user->{"User login"} . "," . $user->{"Pager Number"} . "," . $user->{"Org unit"} . "\n";
+}
+
+sub create_user {
+	my $user_arref = shift;
+	(my $org = $user_arref->[6]) =~ s/\n+|\s+//g; # Removing newlines, which may be caught in original csv
+	my $ipa_responce = `ipa user-add $user_arref->[4] --first="$user_arref->[1]" --last="$user_arref->[0]" --email="$user_arref->[2]" --phone="$user_arref->[3]" --pager="$user_arref->[5] --orgunit="$org" 2>&1`;
+	if ($ipa_responce !~ /ERROR/i) {
+		print "User $user_arref->[4] created!\n";
+	} else {
+		print "Error while creating user $user_arref->[4]: $ipa_responce\n";
+	}
+}
+
 sub main {
 	open (my $fh, "<", $csv_users) or die "Can't open file $csv_users: $!\n";
 	while (<$fh>) {
 		my @csv_line = split /,/;
 		my $user = &check_user($csv_line[4]);
 		if ($user) {
-			print $user->{"User login"} . "," . $user->{"First name"} . "," . $user->{"Last name"} . "\n";
+			&print_user($user);
 		} else {
-			next;
+			$opt_create_users ? &create_user(\@csv_line) : next;
 		}
 
 	}
