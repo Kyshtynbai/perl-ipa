@@ -10,6 +10,7 @@ my $opt_show; # Show users.
 my $opt_create_users; # Create non-existant users
 my $pager; # Update pager
 my $group_file;
+my @groups;
 
 GetOptions ('check' => \$opt_show,
 	   		'users=s' => \$csv_users,
@@ -69,14 +70,36 @@ sub update_pager {
 	my $ipa_responce = `ipa user-mod $user->{"User login"} --pager="$new_pager" 2>&1`;
 	}
 
+sub add_member_to_group {
+	my $login = shift;
+	my $groups = shift;
+	for (@$groups) {
+		my $ipa_responce = `ipa group-add-member $_ --users $login 2>&1`;
+		if ($ipa_responce !~ /ERROR/i) {
+			print "User $login added to group $_\n";
+		} else {
+			print "Can't add user $login to group $_: \n    $ipa_responce\n";
+		}
+	}
+}
+
 sub main {
 	open (my $fh, "<", $csv_users) or die "Can't open file $csv_users: $!\n";
+	if ($group_file) {
+		open (my $fh, "<", $group_file) or die "Can't open file $group_file: $!\n";
+		while (<$fh>) {
+			chomp;
+			puch @groups, $_;
+		}
+		close $fh;
+	}
 	while (<$fh>) {
 		my @csv_line = split /,/;
 		my $user = &check_user($csv_line[4]);
 		if ($user) {
 			&print_user($user);
 			&update_pager($user, $pager) if $pager;
+			&add_member_to_group($user, \@groups) if $group_file;
 		} else {
 			$opt_create_users ? &create_user(\@csv_line) : next;
 		}
